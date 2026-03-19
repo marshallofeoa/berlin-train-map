@@ -3,96 +3,146 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Berlin by Deutschlandticket — Regional Train Map</title>
+<title>Berlin by Deutschlandticket</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f3ee; color: #222; min-height: 100vh; padding: 1.5rem; }
-  h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; color: #111; }
-  .subtitle { font-size: 14px; color: #666; margin-bottom: 16px; }
-  #legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; align-items: center; }
-  .leg { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
-  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
-  #map-wrap { position: relative; max-width: 760px; }
-  svg { border-radius: 10px; border: 0.5px solid #ccc; display: block; width: 100%; }
-  #tooltip {
-    position: absolute; pointer-events: none; display: none;
-    background: #fff; border: 0.5px solid #ccc; border-radius: 8px;
-    padding: 8px 12px; font-size: 13px; line-height: 1.6;
-    max-width: 200px; box-shadow: 0 2px 10px rgba(0,0,0,0.10); z-index: 10;
-  }
-  .note { font-size: 12px; color: #888; margin-top: 10px; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif; background: #f4f1ec; color: #1a1a1a; min-height: 100vh; }
+header { padding: 2rem 2rem 1.25rem; max-width: 920px; }
+h1 { font-size: 26px; font-weight: 500; letter-spacing: -0.3px; color: #111; margin-bottom: 6px; }
+.subtitle { font-size: 15px; color: #666; line-height: 1.55; max-width: 560px; }
+.ticket-tag { display: inline-block; background: #1B5FA0; color: #fff; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; margin-bottom: 10px; letter-spacing: 0.3px; }
+#map-outer { padding: 0 1.5rem 0.75rem; }
+#map-wrap { position: relative; max-width: 920px; border-radius: 12px; overflow: hidden; border: 0.5px solid #ccc; box-shadow: 0 2px 14px rgba(0,0,0,0.08); }
+#main-svg { display: block; width: 100%; }
+#inset-wrap { position: absolute; bottom: 16px; left: 16px; width: 190px; background: #fff; border-radius: 8px; border: 0.5px solid #bbb; box-shadow: 0 2px 10px rgba(0,0,0,0.13); overflow: hidden; }
+#inset-label { font-size: 9.5px; font-weight: 600; color: #666; padding: 5px 8px 2px; letter-spacing: 0.6px; text-transform: uppercase; }
+#inset-svg { display: block; width: 100%; }
+#tooltip { position: absolute; pointer-events: none; display: none; background: #fff; border: 0.5px solid #ccc; border-radius: 10px; padding: 10px 14px; font-size: 13px; line-height: 1.55; max-width: 215px; box-shadow: 0 4px 18px rgba(0,0,0,0.13); z-index: 20; }
+#tooltip strong { font-size: 14px; font-weight: 500; display: block; margin-bottom: 3px; }
+.tt-time { font-weight: 600; font-size: 13px; display: block; }
+.tt-line { color: #777; font-size: 12px; display: block; }
+.tt-note { color: #888; font-size: 12px; font-style: italic; margin-top: 2px; display: block; }
+.meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 0.85rem 1.5rem 2rem; max-width: 920px; }
+.leg { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #555; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1.5px solid rgba(255,255,255,0.5); }
+.ring-swatch { width: 16px; height: 16px; border-radius: 50%; display: inline-block; border: 1.5px dashed #8aa5bf; background: rgba(138,165,191,0.12); }
+.note { font-size: 12px; color: #aaa; margin-left: auto; }
+@media (max-width: 600px) {
+  header { padding: 1.25rem 1rem 1rem; } h1 { font-size: 20px; }
+  #map-outer { padding: 0 0 0; } #map-wrap { border-radius: 0; border-left: none; border-right: none; }
+  .meta-row { padding: 0.75rem 1rem 1.5rem; } .note { margin-left: 0; }
+  #inset-wrap { width: 130px; }
+}
 </style>
 </head>
 <body>
-<h1>Berlin by Deutschlandticket</h1>
-<p class="subtitle">Where regional trains (RE/RB/S-Bahn) can take you from Berlin Hbf</p>
-<div id="legend">
-  <span style="font-size:13px;color:#666;margin-right:2px;">Travel time:</span>
-  <span class="leg"><span class="dot" style="background:#378ADD"></span>Start</span>
-  <span class="leg"><span class="dot" style="background:#1D9E75"></span>Under 1 hr</span>
-  <span class="leg"><span class="dot" style="background:#EF9F27"></span>1–2 hrs</span>
-  <span class="leg"><span class="dot" style="background:#D85A30"></span>2–3 hrs</span>
-  <span class="leg"><span class="dot" style="background:#A32D2D"></span>3+ hrs</span>
+<header>
+  <div class="ticket-tag">Deutschlandticket · €58/month</div>
+  <h1>Where can you go from Berlin?</h1>
+  <p class="subtitle">Every destination reachable on regional trains (RE, RB, S-Bahn). No ICE, no supplements — just board and go.</p>
+</header>
+<div id="map-outer">
+  <div id="map-wrap">
+    <svg id="main-svg"></svg>
+    <div id="inset-wrap">
+      <div id="inset-label">Berlin region</div>
+      <svg id="inset-svg"></svg>
+    </div>
+    <div id="tooltip"></div>
+  </div>
 </div>
-<div id="map-wrap">
-  <svg id="tc-svg"></svg>
-  <div id="tooltip"></div>
+<div class="meta-row">
+  <span class="leg"><span class="dot" style="background:#93C4E8"></span>Under 1 hr</span>
+  <span class="leg"><span class="dot" style="background:#4A8EC2"></span>1–2 hrs</span>
+  <span class="leg"><span class="dot" style="background:#1B5FA0"></span>2–3 hrs</span>
+  <span class="leg"><span class="dot" style="background:#0D3260"></span>3+ hrs</span>
+  <span class="leg"><span class="ring-swatch"></span>1 / 2 / 3 hr reach</span>
+  <span class="note">Tap or hover any marker for details</span>
 </div>
-<p class="note">No ICE/IC — regional trains only. Times are approximate from Berlin Hbf. Hover any marker for details.</p>
-
 <script>
 const destinations = [
-  { name:"Berlin Hbf", lat:52.5251, lng:13.3694, time:0, line:"–", note:"Your starting point" },
-  { name:"Potsdam", lat:52.3906, lng:13.0645, time:30, line:"RE1 / S7", note:"Sanssouci, Dutch Quarter" },
-  { name:"Brandenburg a.d. Havel", lat:52.4119, lng:12.5484, time:50, line:"RE1", note:"Medieval old town, bike-friendly" },
-  { name:"Frankfurt (Oder)", lat:52.3454, lng:14.5503, time:55, line:"RE1", note:"Border town, Kleist Museum" },
-  { name:"Eberswalde", lat:52.8345, lng:13.8244, time:45, line:"RE3", note:"Finow Canal, forest hikes" },
-  { name:"Lutherstadt Wittenberg", lat:51.8660, lng:12.6490, time:55, line:"RE3", note:"Luther sites, Reformation history" },
-  { name:"Jüterbog", lat:51.9947, lng:13.0726, time:50, line:"RE7", note:"Intact medieval town wall" },
-  { name:"Neuruppin", lat:52.9209, lng:12.8011, time:60, line:"RE6", note:"Fontane birthplace, lake promenade" },
-  { name:"Oranienburg", lat:52.7537, lng:13.2420, time:35, line:"RE5 / S1", note:"Sachsenhausen memorial, Baroque palace" },
-  { name:"Angermünde", lat:53.0222, lng:13.9955, time:60, line:"RE3", note:"Gate to the Uckermark" },
-  { name:"Magdeburg", lat:52.1205, lng:11.6276, time:80, line:"RE1", note:"Elbe cycling, cathedral" },
-  { name:"Stendal", lat:52.6010, lng:11.8589, time:80, line:"RE2", note:"Altmark region, half-timbered" },
-  { name:"Wittenberge", lat:52.9922, lng:11.7509, time:85, line:"RE2", note:"Gateway to Hamburg, bike town" },
-  { name:"Cottbus", lat:51.7565, lng:14.3329, time:90, line:"RE2", note:"Sorbian culture, Spreewald gateway" },
-  { name:"Halle (Saale)", lat:51.4825, lng:11.9694, time:110, line:"RE3 + RB", note:"Händel birthplace, lively student city" },
-  { name:"Spreewald (Lübben)", lat:51.9397, lng:13.8953, time:75, line:"RE2", note:"Canoe the Spree, pickles & heritage" },
-  { name:"Rheinsberg", lat:53.1003, lng:12.8964, time:90, line:"RE6 + RB", note:"Lakeside palace, Tucholsky memorial" },
-  { name:"Prenzlau", lat:53.3161, lng:13.8632, time:75, line:"RE3", note:"Uckermark lakes, red brick Gothic" },
-  { name:"Schwerin", lat:53.6288, lng:11.4148, time:115, line:"RE3 + RE4", note:"Fairy-tale castle, lake district" },
-  { name:"Rostock", lat:54.0887, lng:12.1404, time:145, line:"RE5 direct", note:"Baltic coast, historic Hanseatic port" },
-  { name:"Stralsund", lat:54.3093, lng:13.0815, time:160, line:"RE3", note:"Rügen gateway, UNESCO old town" },
-  { name:"Greifswald", lat:54.0932, lng:13.3871, time:155, line:"RE3", note:"University town, Caspar David Friedrich" },
-  { name:"Leipzig", lat:51.3406, lng:12.3747, time:120, line:"RE3 + RE13", note:"Bach, vibrant arts scene" },
-  { name:"Dresden", lat:51.0504, lng:13.7373, time:150, line:"RE2 + RB", note:"Baroque city, Zwinger, Elbe valley" },
-  { name:"Görlitz", lat:51.1524, lng:14.9870, time:155, line:"RE1", note:"Germany's easternmost city, film sets" },
-  { name:"Hamburg", lat:53.5511, lng:9.9937, time:185, line:"RE2 + RE5", note:"~3hrs with regional connections" },
-  { name:"Hannover", lat:52.3759, lng:9.7320, time:195, line:"RE2 + ME", note:"Long but doable with changes" },
-  { name:"Erfurt", lat:50.9847, lng:11.0299, time:190, line:"RE + RB", note:"Thuringia's capital, medieval centre" },
-  { name:"Wismar", lat:53.8933, lng:11.4647, time:135, line:"RE4 + RB", note:"UNESCO Hanseatic town, Baltic" },
-  { name:"Waren (Müritz)", lat:53.5199, lng:12.6796, time:125, line:"RE5 + RB", note:"Müritz National Park, lakes" },
+  { name:"Berlin Hbf",             lat:52.5251, lng:13.3694, time:0,   line:"–",          note:"Your starting point",                              label:false },
+  { name:"Potsdam",                lat:52.3906, lng:13.0645, time:30,  line:"RE1 / S7",   note:"Sanssouci, Dutch Quarter",                         label:true  },
+  { name:"Brandenburg a.d. Havel", lat:52.4119, lng:12.5484, time:50,  line:"RE1",        note:"Medieval old town, bike-friendly",                  label:false },
+  { name:"Frankfurt (Oder)",       lat:52.3454, lng:14.5503, time:55,  line:"RE1",        note:"Border town, walk to Poland",                       label:false },
+  { name:"Eberswalde",             lat:52.8345, lng:13.8244, time:45,  line:"RE3",        note:"Finow Canal, forest hikes",                         label:false },
+  { name:"Lutherstadt Wittenberg", lat:51.8660, lng:12.6490, time:55,  line:"RE3",        note:"Luther sites, Reformation history",                 label:false },
+  { name:"Jüterbog",              lat:51.9947, lng:13.0726, time:50,  line:"RE7",        note:"Intact medieval town wall",                         label:false },
+  { name:"Neuruppin",              lat:52.9209, lng:12.8011, time:60,  line:"RE6",        note:"Fontane birthplace, lake promenade",                label:false },
+  { name:"Oranienburg",            lat:52.7537, lng:13.2420, time:35,  line:"RE5 / S1",  note:"Sachsenhausen memorial, Baroque palace",            label:false },
+  { name:"Angermünde",            lat:53.0222, lng:13.9955, time:60,  line:"RE3",        note:"Gate to the Uckermark",                             label:false },
+  { name:"Magdeburg",              lat:52.1205, lng:11.6276, time:80,  line:"RE1",        note:"Elbe cycling, grand cathedral",                     label:true  },
+  { name:"Stendal",                lat:52.6010, lng:11.8589, time:80,  line:"RE2",        note:"Altmark region, half-timbered streets",             label:false },
+  { name:"Wittenberge",            lat:52.9922, lng:11.7509, time:85,  line:"RE2",        note:"Gateway to Hamburg, cycling hub",                  label:false },
+  { name:"Cottbus",                lat:51.7565, lng:14.3329, time:90,  line:"RE2",        note:"Sorbian culture, Spreewald gateway",                label:false },
+  { name:"Halle (Saale)",          lat:51.4825, lng:11.9694, time:110, line:"RE3 + RB",  note:"Händel birthplace, lively student city",           label:false },
+  { name:"Spreewald",              lat:51.9397, lng:13.8953, time:75,  line:"RE2",        note:"Canoe the Spree, pickles & heritage",               label:false },
+  { name:"Rheinsberg",             lat:53.1003, lng:12.8964, time:90,  line:"RE6 + RB",  note:"Lakeside palace, Tucholsky memorial",               label:false },
+  { name:"Prenzlau",               lat:53.3161, lng:13.8632, time:75,  line:"RE3",        note:"Uckermark lakes, red brick Gothic",                 label:false },
+  { name:"Schwerin",               lat:53.6288, lng:11.4148, time:115, line:"RE3 + RE4", note:"Fairy-tale castle, lake district",                  label:true  },
+  { name:"Rostock",                lat:54.0887, lng:12.1404, time:145, line:"RE5 direct",note:"Baltic coast, historic Hanseatic port",              label:true  },
+  { name:"Stralsund",              lat:54.3093, lng:13.0815, time:160, line:"RE3",        note:"Rügen gateway, UNESCO old town",                   label:true  },
+  { name:"Greifswald",             lat:54.0932, lng:13.3871, time:155, line:"RE3",        note:"University town, Caspar David Friedrich country",   label:false },
+  { name:"Leipzig",                lat:51.3406, lng:12.3747, time:120, line:"RE3 + RE13",note:"Bach, vibrant arts & nightlife",                    label:true  },
+  { name:"Dresden",                lat:51.0504, lng:13.7373, time:150, line:"RE2 + RB",  note:"Baroque city, Zwinger, Elbe valley",                label:true  },
+  { name:"Görlitz",               lat:51.1524, lng:14.9870, time:155, line:"RE1",        note:"Easternmost city, stunning pre-war architecture",    label:true  },
+  { name:"Hamburg",                lat:53.5511, lng:9.9937,  time:185, line:"RE2 + RE5", note:"~3 hrs via regional connections",                   label:true  },
+  { name:"Hannover",               lat:52.3759, lng:9.7320,  time:195, line:"RE2 + ME",  note:"Long but doable with a couple of changes",          label:false },
+  { name:"Erfurt",                 lat:50.9847, lng:11.0299, time:190, line:"RE + RB",   note:"Thuringia's capital, medieval centre",              label:true  },
+  { name:"Wismar",                 lat:53.8933, lng:11.4647, time:135, line:"RE4 + RB",  note:"UNESCO Hanseatic town, Baltic coast",               label:false },
+  { name:"Waren (Müritz)",        lat:53.5199, lng:12.6796, time:125, line:"RE5 + RB",  note:"Müritz National Park, lake district",               label:false },
 ];
 
+const BERLIN = { lat:52.5251, lng:13.3694 };
+
 function getColor(t) {
-  if (t === 0) return '#378ADD';
-  if (t < 65) return '#1D9E75';
-  if (t < 125) return '#EF9F27';
-  if (t < 185) return '#D85A30';
-  return '#A32D2D';
+  if (t === 0)  return '#1a1a2e';
+  if (t < 65)   return '#93C4E8';
+  if (t < 125)  return '#4A8EC2';
+  if (t < 185)  return '#1B5FA0';
+  return '#0D3260';
 }
 
-const W = 760, H = 580;
-const svg = d3.select('#tc-svg')
-  .attr('viewBox', `0 0 ${W} ${H}`);
+const W = 920, H = 600;
+const mainSvg = d3.select('#main-svg').attr('viewBox', `0 0 ${W} ${H}`);
+const proj = d3.geoMercator().center([10.8, 51.8]).scale(3100).translate([W/2, H/2]);
+const pathGen = d3.geoPath().projection(proj);
 
-const projection = d3.geoMercator().center([10.5, 51.5]).scale(3000).translate([W/2, H/2]);
-const path = d3.geoPath().projection(projection);
+const IW = 190, IH = 155;
+const insetSvg = d3.select('#inset-svg').attr('viewBox', `0 0 ${IW} ${IH}`);
+const insetProj = d3.geoMercator().center([13.1, 52.47]).scale(17000).translate([IW/2, IH/2]);
+const insetPath = d3.geoPath().projection(insetProj);
 
 const tooltip = document.getElementById('tooltip');
-const wrap = document.getElementById('map-wrap');
+const mapWrap = document.getElementById('map-wrap');
+
+let activeTooltip = null;
+
+function showTooltip(event, d, fromClick) {
+  if (fromClick && activeTooltip === d.name && tooltip.style.display === 'block') {
+    hideTooltip(); return;
+  }
+  activeTooltip = d.name;
+  const svgEl = document.getElementById('main-svg');
+  const svgRect = svgEl.getBoundingClientRect();
+  const wrapRect = mapWrap.getBoundingClientRect();
+  const scaleX = svgRect.width / W;
+  const [px, py] = proj([d.lng, d.lat]);
+  const sx = px * scaleX + (svgRect.left - wrapRect.left);
+  const sy = py * scaleX + (svgRect.top - wrapRect.top);
+  const timeStr = d.time === 0 ? 'Your starting point' : `~${d.time} min from Berlin`;
+  tooltip.innerHTML = `<strong>${d.name}</strong><span class="tt-time" style="color:${getColor(d.time)}">${timeStr}</span>${d.line !== '–' ? `<span class="tt-line">${d.line}</span>` : ''}<span class="tt-note">${d.note}</span>`;
+  let tx = sx + 14, ty = sy - 16;
+  if (tx + 225 > wrapRect.width) tx = sx - 228;
+  if (ty < 8) ty = sy + 14;
+  tooltip.style.left = tx + 'px';
+  tooltip.style.top = ty + 'px';
+  tooltip.style.display = 'block';
+}
+
+function hideTooltip() { tooltip.style.display = 'none'; activeTooltip = null; }
 
 fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
   .then(r => r.json())
@@ -100,57 +150,106 @@ fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
     const countries = topojson.feature(world, world.objects.countries);
     const borders = topojson.mesh(world, world.objects.countries, (a,b) => a !== b);
 
-    svg.append('rect').attr('width', W).attr('height', H).attr('fill', '#c9dff0');
+    // Main map
+    mainSvg.append('rect').attr('width', W).attr('height', H).attr('fill', '#b8d4eb');
+    mainSvg.selectAll('.land').data(countries.features).enter().append('path')
+      .attr('d', pathGen)
+      .attr('fill', d => d.id === '276' ? '#e6ebe0' : '#d8d3c8')
+      .attr('stroke', '#bfb9ae').attr('stroke-width', 0.5);
+    mainSvg.append('path').datum(borders).attr('fill','none')
+      .attr('stroke','#afa9a0').attr('stroke-width', 0.7).attr('d', pathGen);
 
-    svg.selectAll('.country')
-      .data(countries.features)
-      .enter().append('path')
-      .attr('d', path)
-      .attr('fill', d => d.id === '276' ? '#e6ebe0' : '#ede9e0')
-      .attr('stroke', '#b8b2a7')
-      .attr('stroke-width', 0.5);
+    // Isochrone rings
+    const berlinPx = proj([BERLIN.lng, BERLIN.lat]);
+    const northPx = proj([BERLIN.lng, BERLIN.lat + 1]);
+    const pxPerKm = Math.abs(berlinPx[1] - northPx[1]) / 111;
+    const ringKms = [{km:80,label:'1 hr'},{km:155,label:'2 hrs'},{km:230,label:'3 hrs'}];
+    const rg = mainSvg.append('g');
+    ringKms.forEach(ring => {
+      const r = ring.km * pxPerKm;
+      rg.append('circle').attr('cx', berlinPx[0]).attr('cy', berlinPx[1]).attr('r', r)
+        .attr('fill','rgba(138,165,191,0.07)').attr('stroke','#8aa5bf')
+        .attr('stroke-width', 1).attr('stroke-dasharray','5,4').attr('opacity', 0.65);
+      rg.append('text').attr('x', berlinPx[0] + r + 5).attr('y', berlinPx[1] - 3)
+        .attr('fill','#7a95ad').attr('font-size','10.5px')
+        .attr('font-family','-apple-system,sans-serif').text(ring.label);
+    });
 
-    svg.append('path')
-      .datum(borders)
-      .attr('fill', 'none')
-      .attr('stroke', '#aaa49a')
-      .attr('stroke-width', 0.6)
-      .attr('d', path);
-
-    const markers = svg.selectAll('.dest')
-      .data(destinations)
-      .enter().append('g')
-      .attr('transform', d => {
-        const [x,y] = projection([d.lng, d.lat]);
-        return `translate(${x},${y})`;
-      })
+    // Markers
+    const mg = mainSvg.append('g');
+    const markers = mg.selectAll('.dest').data(destinations).enter().append('g')
+      .attr('class','dest')
+      .attr('transform', d => { const [x,y] = proj([d.lng,d.lat]); return `translate(${x},${y})`; })
       .style('cursor','pointer');
 
     markers.append('circle')
-      .attr('r', d => d.time === 0 ? 9 : 7)
-      .attr('fill', d => getColor(d.time))
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 1.8)
-      .attr('opacity', 0.93);
+      .attr('r', d => (d.time === 0 ? 8 : 6) + 1.5)
+      .attr('fill','rgba(0,0,0,0.1)').attr('cy', 1);
 
-    markers.on('mousemove', function(event, d) {
-      const rect = wrap.getBoundingClientRect();
-      const svgEl = document.getElementById('tc-svg');
-      const svgRect = svgEl.getBoundingClientRect();
-      const scaleX = svgRect.width / W;
-      const [px, py] = projection([d.lng, d.lat]);
-      const sx = px * scaleX + (svgRect.left - rect.left);
-      const sy = py * scaleX + (svgRect.top - rect.top);
-      const timeStr = d.time === 0 ? 'Starting point' : `~${d.time} min`;
-      tooltip.innerHTML = `<strong style="font-size:14px;">${d.name}</strong><br><span style="color:${getColor(d.time)};font-weight:600;">${timeStr}</span><br><span style="color:#666;font-size:12px;">${d.line}</span><br><em style="font-size:12px;color:#888;">${d.note}</em>`;
-      let tx = sx + 14, ty = sy - 10;
-      if (tx + 210 > rect.width) tx = sx - 220;
-      if (ty < 0) ty = sy + 14;
-      tooltip.style.left = tx + 'px';
-      tooltip.style.top = ty + 'px';
-      tooltip.style.display = 'block';
-    })
-    .on('mouseleave', () => { tooltip.style.display = 'none'; });
+    markers.append('circle')
+      .attr('r', d => d.time === 0 ? 8 : 6)
+      .attr('fill', d => getColor(d.time))
+      .attr('stroke','#fff').attr('stroke-width', 1.8);
+
+    // Labels — key destinations
+    markers.filter(d => d.label && d.time > 0).append('text')
+      .attr('y', d => -(d.time === 0 ? 8 : 6) - 5)
+      .attr('text-anchor','middle')
+      .attr('font-size','11px').attr('font-weight','500')
+      .attr('font-family','-apple-system,sans-serif')
+      .attr('fill','#111')
+      .attr('paint-order','stroke')
+      .attr('stroke','rgba(230,235,224,0.9)').attr('stroke-width','3px').attr('stroke-linejoin','round')
+      .text(d => d.name);
+
+    // Berlin label
+    markers.filter(d => d.time === 0).append('text')
+      .attr('x', 11).attr('y', 4)
+      .attr('font-size','12px').attr('font-weight','600')
+      .attr('font-family','-apple-system,sans-serif').attr('fill','#111')
+      .attr('paint-order','stroke')
+      .attr('stroke','rgba(230,235,224,0.9)').attr('stroke-width','3px')
+      .text('Berlin');
+
+    markers
+      .on('mousemove', (e, d) => showTooltip(e, d, false))
+      .on('mouseleave', hideTooltip)
+      .on('click', (e, d) => { e.stopPropagation(); showTooltip(e, d, true); });
+
+    mapWrap.addEventListener('click', hideTooltip);
+
+    // Inset map
+    insetSvg.append('rect').attr('width', IW).attr('height', IH).attr('fill','#b8d4eb');
+    insetSvg.selectAll('.land').data(countries.features).enter().append('path')
+      .attr('d', insetPath)
+      .attr('fill', d => d.id === '276' ? '#e6ebe0' : '#d8d3c8')
+      .attr('stroke','#bfb9ae').attr('stroke-width',0.4);
+
+    const bInPx = insetProj([BERLIN.lng, BERLIN.lat]);
+    const nInPx = insetProj([BERLIN.lng, BERLIN.lat + 1]);
+    const inPxKm = Math.abs(bInPx[1] - nInPx[1]) / 111;
+
+    insetSvg.append('circle')
+      .attr('cx',bInPx[0]).attr('cy',bInPx[1]).attr('r', 80 * inPxKm)
+      .attr('fill','rgba(138,165,191,0.08)').attr('stroke','#8aa5bf')
+      .attr('stroke-width',0.8).attr('stroke-dasharray','3,3').attr('opacity',0.7);
+
+    const nearDests = destinations.filter(d => d.time < 65);
+    const insetLabels = ['Berlin Hbf','Potsdam','Oranienburg'];
+    const ig = insetSvg.append('g');
+    nearDests.forEach(d => {
+      const [x,y] = insetProj([d.lng, d.lat]);
+      ig.append('circle').attr('cx',x).attr('cy',y)
+        .attr('r', d.time === 0 ? 6 : 4)
+        .attr('fill', getColor(d.time)).attr('stroke','#fff').attr('stroke-width',1.2);
+      if (insetLabels.includes(d.name)) {
+        ig.append('text').attr('x',x).attr('y', y - (d.time === 0 ? 9 : 7))
+          .attr('text-anchor','middle').attr('font-size','8.5px').attr('font-weight','500')
+          .attr('font-family','-apple-system,sans-serif').attr('fill','#111')
+          .attr('paint-order','stroke').attr('stroke','rgba(230,235,224,0.9)').attr('stroke-width','2px')
+          .text(d.name === 'Berlin Hbf' ? 'Berlin' : d.name);
+      }
+    });
   });
 </script>
 </body>
